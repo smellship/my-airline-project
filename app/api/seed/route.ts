@@ -12,20 +12,17 @@ export async function GET() {
     await db.collection('schedules').deleteMany({});
     await db.collection('passengers').deleteMany({});
 
-    // 2. 在云端读取并处理 CSV 文件
-    // Vercel 环境下，使用 process.cwd() 获取项目根目录
+    // 2. 处理 CSV 乘客数据
     const csvPath = path.join(process.cwd(), 'randomnames.csv');
     const csvContent = fs.readFileSync(csvPath, 'utf8');
-    
     const passengerLines = csvContent.split('\n').filter(line => line.trim() !== '');
+    
     const passengerDocs = passengerLines.map(line => {
-      // 假设格式: ID,Title,FirstName,LastName,Gender,Email
-      const [id, title, firstName, lastName, gender, email] = line.split(',');
+      const parts = line.split(',');
       return {
-        title: title?.trim(),
-        firstName: firstName?.trim(),
-        lastName: lastName?.trim(),
-        email: email?.trim()
+        firstName: parts[2]?.trim(),
+        lastName: parts[3]?.trim(),
+        email: parts[5]?.trim()
       };
     });
 
@@ -33,8 +30,9 @@ export async function GET() {
       await db.collection('passengers').insertMany(passengerDocs);
     }
 
-    // 3. 生成航班数据 (保持之前的逻辑)
-    const flights = [];
+    // 3. 生成航班数据并随机分配预订
+    // 【修正点】：显式指定 flights 的类型为 any[]
+    const flights: any[] = []; 
     const startDate = new Date("2026-05-18");
     const daysToGenerate = 21; 
 
@@ -44,37 +42,58 @@ export async function GET() {
       const day = curr.getDay(); 
       const dateStr = curr.toISOString().split('T')[0];
 
-      // Sydney (SJ101/102)
-      if (day === 5) flights.push(makeF("SJ101", "NZNE", "YSSY", dateStr, "10:30", "SyberJet SJ30i", 6, 350));
-      if (day === 0) flights.push(makeF("SJ102", "YSSY", "NZNE", dateStr, "15:30", "SyberJet SJ30i", 6, 350));
-
-      // Rotorua (RT201-204)
+      // 【修正点】：显式指定 dailyFlights 的类型为 any[]
+      const dailyFlights: any[] = []; 
+      
+      if (day === 5) dailyFlights.push(makeF("SJ101", "NZNE", "YSSY", dateStr, "10:30", "SyberJet SJ30i", 6, 350));
+      if (day === 0) dailyFlights.push(makeF("SJ102", "YSSY", "NZNE", dateStr, "15:30", "SyberJet SJ30i", 6, 350));
       if (day >= 1 && day <= 5) {
-        flights.push(makeF("RT201", "NZNE", "NZRO", dateStr, "07:00", "Cirrus SF50", 4, 120));
-        flights.push(makeF("RT202", "NZRO", "NZNE", dateStr, "08:30", "Cirrus SF50", 4, 120));
-        flights.push(makeF("RT203", "NZNE", "NZRO", dateStr, "16:30", "Cirrus SF50", 4, 120));
-        flights.push(makeF("RT204", "NZRO", "NZNE", dateStr, "18:00", "Cirrus SF50", 4, 120));
+        dailyFlights.push(makeF("RT201", "NZNE", "NZRO", dateStr, "07:00", "Cirrus SF50", 4, 120));
+        dailyFlights.push(makeF("RT203", "NZNE", "NZRO", dateStr, "16:30", "Cirrus SF50", 4, 120));
       }
+      if ([1, 3, 5].includes(day)) dailyFlights.push(makeF("GB301", "NZNE", "NZGB", dateStr, "09:00", "Cirrus SF50", 4, 90));
+      if ([2, 5].includes(day)) dailyFlights.push(makeF("CI401", "NZNE", "NZCI", dateStr, "11:00", "HondaJet Elite", 5, 280));
+      if (day === 1) dailyFlights.push(makeF("TL501", "NZNE", "NZTL", dateStr, "13:00", "HondaJet Elite", 5, 200));
 
-      // 其他航线简略添加... (以此类推)
-      if ([1, 3, 5].includes(day)) flights.push(makeF("GB301", "NZNE", "NZGB", dateStr, "09:00", "Cirrus SF50", 4, 90));
-      if ([2, 5].includes(day)) flights.push(makeF("CI401", "NZNE", "NZCI", dateStr, "11:00", "HondaJet Elite", 5, 280));
+      // 为每一架次随机分配 1-2 名乘客
+      dailyFlights.forEach(f => {
+        const numBookings = Math.floor(Math.random() * 2) + 1; 
+        for (let j = 0; j < numBookings; j++) {
+          const randomP = passengerDocs[Math.floor(Math.random() * passengerDocs.length)];
+          f.bookings.push({
+            bookingReference: Math.random().toString(36).substring(2, 9).toUpperCase(),
+            passengerName: `${randomP.firstName} ${randomP.lastName}`,
+            passengerEmail: randomP.email,
+            bookedAt: new Date()
+          });
+        }
+        flights.push(f);
+      });
     }
 
     await db.collection('schedules').insertMany(flights);
 
     return NextResponse.json({ 
-      message: "Seeding Successful!", 
+      message: "Seeding Successful with Bookings!", 
       passengersImported: passengerDocs.length,
-      flightsGenerated: flights.length 
+      flightsWithPreBookings: flights.length 
     });
 
   } catch (e: any) {
-    console.error(e);
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
 
 function makeF(fn:string, orig:string, dest:string, date:string, time:string, craft:string, cap:number, pr:number) {
-  return { flightNumber: fn, origin: orig, destination: dest, departureDate: date, departureTime: time, aircraft: craft, capacity: cap, price: pr, bookings: [] };
+  return { 
+    flightNumber: fn, 
+    origin: orig, 
+    destination: dest, 
+    departureDate: date, 
+    departureTime: time, 
+    aircraft: craft, 
+    capacity: cap, 
+    price: pr, 
+    bookings: [] as any[] // 确保 bookings 也是 any[]
+  };
 }
