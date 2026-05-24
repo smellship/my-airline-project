@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
-// 1. 定义机场列表 (符合作业 Brief)
+// 机场常量 - 严格按照作业 Brief
 const AIRPORTS = [
   { code: 'NZNE', name: 'Dairy Flat (Hub)' },
   { code: 'YSSY', name: 'Sydney' },
@@ -12,174 +13,201 @@ const AIRPORTS = [
 ];
 
 export default function Home() {
+  // 搜索状态
   const [orig, setOrig] = useState('NZNE');
   const [dest, setDest] = useState('YSSY');
-  const [date, setDate] = useState('2026-05-29'); // 默认设为一个有航班的周五
+  const [date, setDate] = useState('2026-05-29'); // 默认周五 (Sydney有航线)
   const [flights, setFlights] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
 
-  // 搜索航班函数
+  // 订票发票状态
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [lastBooking, setLastBooking] = useState<any>(null);
+
+  // 搜索航班
   const handleSearch = async () => {
     setLoading(true);
-    setMessage('');
+    setFlights([]);
     try {
       const res = await fetch(`/api/flights?orig=${orig}&dest=${dest}&date=${date}`);
       const data = await res.json();
       setFlights(data);
-      if (data.length === 0) setMessage('No flights found for this route/date.');
     } catch (err) {
-      setMessage('Search failed. Please check your connection.');
+      console.error("Search error", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // 订票函数
-  const handleBook = async (flightId: string, flightNum: string) => {
-    const passengerName = prompt(`Booking Flight ${flightNum}\nPlease enter Passenger Name:`);
-    if (!passengerName) return;
-
-    const passengerEmail = prompt(`Please enter contact Email:`);
-    if (!passengerEmail) return;
+  // 处理订票
+  const handleBook = async (f: any) => {
+    const name = prompt(`Booking ${f.flightNumber}\nPlease enter Passenger Name:`);
+    if (!name) return;
+    const email = prompt(`Please enter Passenger Email:`);
+    if (!email) return;
 
     try {
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ flightId, passengerName, passengerEmail })
+        body: JSON.stringify({ flightId: f._id, passengerName: name, passengerEmail: email })
       });
-      const result = await res.json();
+      const data = await res.json();
 
       if (res.ok) {
-        alert(`Successfully Booked!\nYour Reference: ${result.reference}\n\nPlease keep this for your records.`);
-        handleSearch(); // 刷新列表查看剩余容量
+        // 展示发票详情 (Assignment Requirement)
+        setLastBooking({
+          ...f,
+          passengerName: name,
+          passengerEmail: email,
+          reference: data.reference
+        });
+        setShowInvoice(true);
+        handleSearch(); // 刷新列表
       } else {
-        alert(`Booking failed: ${result.error}`);
+        alert("Booking error: " + data.error);
       }
     } catch (err) {
-      alert('Network error during booking.');
+      alert("Network error occurred.");
     }
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-      {/* Header */}
-      <header className="bg-slate-900 border-b border-slate-800 p-6 shadow-2xl">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <h1 className="text-3xl font-extrabold tracking-tight text-blue-500">
-            Dairy Flat <span className="text-white">Airlines</span>
-          </h1>
-          <nav className="space-x-4 text-sm font-medium">
-            <span className="text-green-500">● Database Online</span>
+    <main className="min-h-screen bg-slate-950 text-slate-100 pb-20 font-sans">
+      {/* 顶部导航 */}
+      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold">D</div>
+            <h1 className="text-xl font-black tracking-tighter">DAIRY FLAT AIR</h1>
+          </div>
+          <nav className="flex gap-6">
+            <Link href="/" className="text-blue-500 font-bold">Search Flights</Link>
+            <Link href="/my-bookings" className="text-slate-400 hover:text-white transition-colors">My Bookings</Link>
           </nav>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto p-6">
-        {/* Search Bar Section */}
-        <section className="bg-slate-900 p-8 rounded-2xl border border-slate-800 shadow-xl mb-10">
-          <h2 className="text-xl font-semibold mb-6">Search Scheduled Flights</h2>
+      {/* Hero 区域 */}
+      <div className="max-w-6xl mx-auto px-6 pt-12">
+        <div className="mb-12">
+          <h2 className="text-5xl font-black mb-4">Fly Beyond Limits.</h2>
+          <p className="text-slate-400 max-w-xl">Exclusive point-to-point service from our North Albany hub. Luxury light jets to New Zealand&apos;s most iconic destinations.</p>
+        </div>
+
+        {/* 搜索面板 */}
+        <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-2xl mb-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="flex flex-col">
-              <label className="text-xs uppercase text-slate-500 mb-2 font-bold">Origin</label>
-              <select 
-                value={orig} 
-                onChange={e => setOrig(e.target.value)}
-                className="bg-slate-800 border border-slate-700 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              >
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Origin</label>
+              <select value={orig} onChange={e => setOrig(e.target.value)} className="w-full bg-slate-800 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-600">
                 {AIRPORTS.map(ap => <option key={ap.code} value={ap.code}>{ap.name}</option>)}
               </select>
             </div>
-
-            <div className="flex flex-col">
-              <label className="text-xs uppercase text-slate-500 mb-2 font-bold">Destination</label>
-              <select 
-                value={dest} 
-                onChange={e => setDest(e.target.value)}
-                className="bg-slate-800 border border-slate-700 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              >
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Destination</label>
+              <select value={dest} onChange={e => setDest(e.target.value)} className="w-full bg-slate-800 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-600">
                 {AIRPORTS.map(ap => <option key={ap.code} value={ap.code}>{ap.name}</option>)}
               </select>
             </div>
-
-            <div className="flex flex-col">
-              <label className="text-xs uppercase text-slate-500 mb-2 font-bold">Date</label>
-              <input 
-                type="date" 
-                value={date} 
-                onChange={e => setDate(e.target.value)}
-                className="bg-slate-800 border border-slate-700 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              />
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-slate-800 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-600" />
             </div>
-
-            <div className="flex flex-col justify-end">
-              <button 
-                onClick={handleSearch}
-                disabled={loading}
-                className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg"
-              >
-                {loading ? 'Searching...' : 'Find Flights'}
+            <div className="flex items-end">
+              <button onClick={handleSearch} className="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-900/20">
+                {loading ? 'Finding...' : 'Search Flights'}
               </button>
             </div>
           </div>
-        </section>
+        </div>
 
-        {/* Results Section */}
-        <section>
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">Available Flights</h2>
-            <p className="text-slate-400 text-sm">Showing results for {date}</p>
-          </div>
-
-          {message && (
-            <div className="bg-slate-900 border border-slate-800 p-10 text-center rounded-2xl text-slate-400">
-              {message}
+        {/* 结果列表 */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-bold text-slate-500 uppercase mb-6 tracking-widest">Available Results</h3>
+          {flights.length === 0 && !loading && (
+            <div className="text-center py-20 border-2 border-dashed border-slate-800 rounded-3xl">
+              <p className="text-slate-500">Select a route and date to see scheduled flights.</p>
             </div>
           )}
-
-          <div className="space-y-4">
-            {flights.map((f: any) => (
-              <div key={f._id} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl hover:border-slate-600 transition-all flex flex-col md:flex-row justify-between items-center shadow-md">
-                <div className="flex items-center gap-6 mb-4 md:mb-0">
-                  <div className="bg-blue-900/30 p-4 rounded-xl">
-                    <p className="text-blue-400 font-black text-2xl">{f.flightNumber}</p>
-                    <p className="text-[10px] uppercase text-slate-500">{f.aircraft}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-400 font-medium">Departure</p>
-                    <p className="text-xl font-bold">{f.departureTime}</p>
-                    <p className="text-xs text-slate-500">{f.origin} → {f.destination}</p>
-                  </div>
+          
+          {flights.map((f: any) => (
+            <div key={f._id} className="bg-slate-900 p-6 rounded-3xl border border-slate-800 flex flex-col md:flex-row justify-between items-center gap-6">
+              <div className="flex items-center gap-6">
+                <div className="h-16 w-16 bg-slate-800 rounded-2xl flex flex-col items-center justify-center">
+                  <span className="text-blue-500 font-black text-xs">{f.flightNumber}</span>
                 </div>
-
-                <div className="flex items-center gap-8">
-                  <div className="text-right">
-                    <p className="text-xs text-slate-500 font-bold uppercase">Price</p>
-                    <p className="text-3xl font-black text-green-400">${f.price}</p>
-                    <p className="text-[10px] text-slate-500">Seats Left: {f.capacity - (f.bookings?.length || 0)}</p>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg font-bold">{f.departureTime}</span>
+                    <span className="text-slate-600">→</span>
+                    <span className="text-slate-400 text-xs">{f.aircraft}</span>
                   </div>
-                  <button 
-                    onClick={() => handleBook(f._id, f.flightNumber)}
-                    disabled={f.bookings?.length >= f.capacity}
-                    className={`px-8 py-3 rounded-xl font-bold transition-all ${
-                      f.bookings?.length >= f.capacity 
-                      ? 'bg-slate-800 text-slate-500 cursor-not-allowed' 
-                      : 'bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20'
-                    }`}
-                  >
-                    {f.bookings?.length >= f.capacity ? 'Sold Out' : 'Book Now'}
-                  </button>
+                  <p className="text-xs text-slate-500 font-medium">{f.origin} to {f.destination}</p>
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
+              
+              <div className="flex items-center gap-8">
+                <div className="text-right">
+                  <p className="text-2xl font-black text-green-400">${f.price}</p>
+                  <p className="text-[10px] text-slate-600 font-bold uppercase">{f.capacity - (f.bookings?.length || 0)} Seats Left</p>
+                </div>
+                <button 
+                  onClick={() => handleBook(f)}
+                  disabled={f.bookings?.length >= f.capacity}
+                  className={`px-8 py-3 rounded-2xl font-bold transition-all ${
+                    f.bookings?.length >= f.capacity 
+                    ? 'bg-slate-800 text-slate-600' 
+                    : 'bg-white text-black hover:bg-blue-500 hover:text-white'
+                  }`}
+                >
+                  {f.bookings?.length >= f.capacity ? 'Sold Out' : 'Book Now'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      <footer className="mt-20 border-t border-slate-900 p-10 text-center text-slate-600 text-sm">
-        &copy; 2026 Dairy Flat Airlines System | 159.352 Assignment 2
-      </footer>
+      {/* 发票模态框 (Invoice Modal) */}
+      {showInvoice && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 z-50">
+          <div className="bg-white text-slate-900 max-w-md w-full rounded-3xl overflow-hidden shadow-2xl">
+            <div className="bg-blue-600 p-8 text-white">
+              <h4 className="text-2xl font-black">BOOKING INVOICE</h4>
+              <p className="text-blue-200 text-sm">Ref: {lastBooking?.reference}</p>
+            </div>
+            <div className="p-8 space-y-4">
+              <div className="flex justify-between border-b pb-4">
+                <span className="text-slate-500 font-medium">Passenger</span>
+                <span className="font-bold">{lastBooking?.passengerName}</span>
+              </div>
+              <div className="flex justify-between border-b pb-4">
+                <span className="text-slate-500 font-medium">Flight</span>
+                <span className="font-bold">{lastBooking?.flightNumber}</span>
+              </div>
+              <div className="flex justify-between border-b pb-4">
+                <span className="text-slate-500 font-medium">Route</span>
+                <span className="font-bold">{lastBooking?.origin} ➔ {lastBooking?.destination}</span>
+              </div>
+              <div className="flex justify-between border-b pb-4">
+                <span className="text-slate-500 font-medium">Departure</span>
+                <span className="font-bold">{lastBooking?.departureDate} @ {lastBooking?.departureTime}</span>
+              </div>
+              <div className="flex justify-between pt-4">
+                <span className="text-slate-900 font-black text-xl">TOTAL PAID</span>
+                <span className="text-blue-600 font-black text-2xl">${lastBooking?.price}</span>
+              </div>
+              <button 
+                onClick={() => setShowInvoice(false)}
+                className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold mt-6"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
