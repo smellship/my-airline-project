@@ -8,11 +8,11 @@ export async function GET() {
     const client = await clientPromise;
     const db = client.db();
 
-    // 1. 清除旧数据
+    
     await db.collection('schedules').deleteMany({});
     await db.collection('passengers').deleteMany({});
 
-    // 2. 处理 CSV 乘客数据
+    
     const csvPath = path.join(process.cwd(), 'randomnames.csv');
     const csvContent = fs.readFileSync(csvPath, 'utf8');
     const passengerLines = csvContent.split('\n').filter(line => line.trim() !== '');
@@ -30,8 +30,8 @@ export async function GET() {
       await db.collection('passengers').insertMany(passengerDocs);
     }
 
-    // 3. 生成航班数据并随机分配预订
-    // 【修正点】：显式指定 flights 的类型为 any[]
+    
+    
     const flights: any[] = []; 
     const startDate = new Date("2026-05-18");
     const daysToGenerate = 21; 
@@ -42,7 +42,7 @@ export async function GET() {
       const day = curr.getDay(); 
       const dateStr = curr.toISOString().split('T')[0];
 
-      // 【修正点】：显式指定 dailyFlights 的类型为 any[]
+      
       const dailyFlights: any[] = []; 
       
       if (day === 5) dailyFlights.push(makeF("SJ101", "NZNE", "YSSY", dateStr, "10:30", "SyberJet SJ30i", 6, 350));
@@ -55,7 +55,7 @@ export async function GET() {
       if ([2, 5].includes(day)) dailyFlights.push(makeF("CI401", "NZNE", "NZCI", dateStr, "11:00", "HondaJet Elite", 5, 280));
       if (day === 1) dailyFlights.push(makeF("TL501", "NZNE", "NZTL", dateStr, "13:00", "HondaJet Elite", 5, 200));
 
-      // 为每一架次随机分配 1-2 名乘客
+      
       dailyFlights.forEach(f => {
         const numBookings = Math.floor(Math.random() * 2) + 1; 
         for (let j = 0; j < numBookings; j++) {
@@ -94,6 +94,6 @@ function makeF(fn:string, orig:string, dest:string, date:string, time:string, cr
     aircraft: craft, 
     capacity: cap, 
     price: pr, 
-    bookings: [] as any[] // 确保 bookings 也是 any[]
+    bookings: [] as any[] 
   };
 }

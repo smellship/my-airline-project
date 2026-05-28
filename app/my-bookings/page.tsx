@@ -35,7 +35,7 @@ export default function MyBookings() {
 
       if (res.ok) {
         alert("Booking cancelled successfully.");
-        fetchBookings(); // 刷新列表
+        fetchBookings(); 
       } else {
         alert("Failed to cancel booking.");
       }

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-// 机场常量 - 严格按照作业 Brief
+
 const AIRPORTS = [
   { code: 'NZNE', name: 'Dairy Flat (Hub)' },
   { code: 'YSSY', name: 'Sydney' },
@@ -13,18 +13,18 @@ const AIRPORTS = [
 ];
 
 export default function Home() {
-  // 搜索状态
+  
   const [orig, setOrig] = useState('NZNE');
   const [dest, setDest] = useState('YSSY');
-  const [date, setDate] = useState('2026-05-29'); // 默认周五 (Sydney有航线)
+  const [date, setDate] = useState('2026-05-29'); 
   const [flights, setFlights] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // 订票发票状态
+  
   const [showInvoice, setShowInvoice] = useState(false);
   const [lastBooking, setLastBooking] = useState<any>(null);
 
-  // 搜索航班
+  
   const handleSearch = async () => {
     setLoading(true);
     setFlights([]);
@@ -39,7 +39,7 @@ export default function Home() {
     }
   };
 
-  // 处理订票
+  
   const handleBook = async (f: any) => {
     const name = prompt(`Booking ${f.flightNumber}\nPlease enter Passenger Name:`);
     if (!name) return;
@@ -55,7 +55,7 @@ export default function Home() {
       const data = await res.json();
 
       if (res.ok) {
-        // 展示发票详情 (Assignment Requirement)
+        
         setLastBooking({
           ...f,
           passengerName: name,
@@ -63,7 +63,7 @@ export default function Home() {
           reference: data.reference
         });
         setShowInvoice(true);
-        handleSearch(); // 刷新列表
+        handleSearch(); 
       } else {
         alert("Booking error: " + data.error);
       }

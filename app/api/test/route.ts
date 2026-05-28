@@ -4,10 +4,10 @@ import clientPromise from '@/lib/mongodb';
 export async function GET() {
   try {
     const client = await clientPromise;
-    // 获取数据库实例
+    
     const db = client.db();
     
-    // 尝试列出当前数据库中的所有集合名称
+    
     const collections = await db.listCollections().toArray();
     const collectionNames = collections.map(col => col.name);
 
